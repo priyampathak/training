@@ -1,0 +1,53 @@
+
+> trainform@1.0.0 build
+> next build
+
+   ▲ Next.js 15.5.6
+   - Environments: .env.local
+   - Experiments (use with caution):
+     · serverActions
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 13.7s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/19) ...
+   Generating static pages (4/19) 
+   Generating static pages (9/19) 
+   Generating static pages (14/19) 
+ ✓ Generating static pages (19/19)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                       Size  First Load JS
+┌ ○ /                                            129 B         102 kB
+├ ○ /_not-found                                  998 B         103 kB
+├ ƒ /admin/login                               3.33 kB         113 kB
+├ ƒ /dashboard/admin                           1.91 kB         115 kB
+├ ƒ /dashboard/admin/analytics                 1.91 kB         115 kB
+├ ƒ /dashboard/admin/companies                 6.08 kB         128 kB
+├ ƒ /dashboard/admin/modules                   8.53 kB         160 kB
+├ ƒ /dashboard/admin/plans                     5.56 kB         127 kB
+├ ƒ /dashboard/admin/users                      7.3 kB         129 kB
+├ ƒ /dashboard/company                         1.91 kB         115 kB
+├ ƒ /dashboard/company/analytics                121 kB         243 kB
+├ ƒ /dashboard/company/modules                 1.91 kB         115 kB
+├ ƒ /dashboard/company/modules/[id]/analytics    165 B         105 kB
+├ ƒ /dashboard/company/modules/[id]/responses    165 B         105 kB
+├ ƒ /dashboard/company/team                    24.6 kB         147 kB
+├ ƒ /dashboard/company/training                8.51 kB         160 kB
+├ ƒ /dashboard/learn                           1.91 kB         115 kB
+├ ƒ /dashboard/learn/courses                   13.9 kB         136 kB
+├ ƒ /dashboard/learn/progress                  6.55 kB         116 kB
+├ ○ /debug-cookies                             2.14 kB         112 kB
+├ ƒ /login                                     3.27 kB         113 kB
+└ ○ /login-api                                 3.28 kB         113 kB
++ First Load JS shared by all                   102 kB
+  ├ chunks/255-a78b69fc76e8afca.js             45.6 kB
+  ├ chunks/4bd1b696-409494caf8c83275.js        54.2 kB
+  └ other shared chunks (total)                1.93 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
