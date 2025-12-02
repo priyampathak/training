@@ -116,10 +116,14 @@ export async function getAllModules(): Promise<ModuleResponse> {
         _id: module._id.toString(),
         assignedCompanyId: module.assignedCompanyId?._id?.toString() || null,
         assignedCompanyName: module.assignedCompanyId?.name || "Global",
-        createdBy: {
+        createdBy: module.createdBy ? {
           _id: module.createdBy._id.toString(),
           name: module.createdBy.name,
           email: module.createdBy.email,
+        } : {
+          _id: "unknown",
+          name: "Unknown User",
+          email: "N/A",
         },
         slides: module.slides?.map((slide: any) => ({
           ...slide,
