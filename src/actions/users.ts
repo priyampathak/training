@@ -352,6 +352,11 @@ export async function deleteUser(userId: string): Promise<UserResponse> {
       };
     }
 
+    // Delete user's ModuleProgress records first (cleanup related data)
+    const ModuleProgress = (await import("@/src/models/ModuleProgress")).default;
+    const deletedProgressCount = await ModuleProgress.deleteMany({ userId: userId });
+    console.log(`🧹 Deleted ${deletedProgressCount.deletedCount} progress records for user ${userId}`);
+
     // Permanently delete user from database
     const deletedUser = await User.findByIdAndDelete(userId);
 
@@ -363,10 +368,11 @@ export async function deleteUser(userId: string): Promise<UserResponse> {
     }
 
     revalidatePath("/dashboard/admin/users");
+    revalidatePath("/dashboard/company/training");
 
     return {
       success: true,
-      message: "User permanently deleted from database",
+      message: `User and ${deletedProgressCount.deletedCount} progress records permanently deleted`,
       data: {
         userId: deletedUser._id.toString(),
         email: deletedUser.email,

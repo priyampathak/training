@@ -522,34 +522,50 @@ export async function deleteCompanyModule(
   moduleId: string
 ): Promise<ModuleResponse> {
   try {
+    console.log("🗑️ Starting delete for module:", moduleId);
+    
     const session = await getSession();
     if (!session || session.role !== "COMPANY_ADMIN") {
+      console.error("❌ Unauthorized - no session or wrong role");
       return { success: false, message: "Unauthorized" };
     }
+
+    console.log("✅ Session valid, companyId:", session.companyId);
 
     const { TrainingModule } = await getModels();
 
     const module = await TrainingModule.findById(moduleId);
     if (!module) {
+      console.error("❌ Module not found:", moduleId);
       return { success: false, message: "Module not found" };
     }
 
+    console.log("📦 Found module:", module.meta?.title);
+    console.log("📦 Module assignedCompanyId:", module.assignedCompanyId?.toString());
+    console.log("📦 Session companyId:", session.companyId);
+
     // Verify the module belongs to this company
-    if (module.assignedCompanyId?.toString() !== session.companyId) {
+    const moduleCompanyId = module.assignedCompanyId?.toString();
+    if (moduleCompanyId !== session.companyId) {
+      console.error("❌ Company mismatch:", {
+        moduleCompanyId,
+        sessionCompanyId: session.companyId,
+      });
       return {
         success: false,
         message: "You can only delete modules from your company",
       };
     }
 
-    // Soft delete
-    module.isActive = false;
-    await module.save();
+    // Hard delete the module from database
+    await TrainingModule.findByIdAndDelete(moduleId);
+    
+    console.log("✅ Module deleted successfully:", moduleId);
 
     return { success: true, message: "Module deleted successfully" };
   } catch (error: any) {
-    console.error("Delete company module error:", error);
-    return { success: false, message: "Failed to delete module" };
+    console.error("❌ Delete company module error:", error);
+    return { success: false, message: error.message || "Failed to delete module" };
   }
 }
 
@@ -630,17 +646,25 @@ export async function getModuleAnalytics(
     });
 
     // Get progress records for this module and company
-    const progressRecords = await ModuleProgress.find({
+    const progressRecordsRaw = await ModuleProgress.find({
       moduleId: moduleId,
       companyId: session.companyId,
     })
-      .populate("userId", "name email")
+      .populate("userId", "name email isActive isDeleted")
       .sort({ updatedAt: -1 })
       .lean();
 
+    // Filter out records where user is null, deleted, or inactive
+    const progressRecords = progressRecordsRaw.filter((p: any) => {
+      if (!p.userId) return false; // User was deleted (null after populate)
+      if (p.userId.isDeleted) return false; // User is soft-deleted
+      if (!p.userId.isActive) return false; // User is inactive
+      return true;
+    });
+
     // Calculate metrics
     const totalAttempts = progressRecords.length;
-    const uniqueUsers = [...new Set(progressRecords.map((p: any) => p.userId?._id?.toString()))];
+    const uniqueUsers = [...new Set(progressRecords.map((p: any) => p.userId?._id?.toString()).filter(Boolean))];
     const totalUsersStarted = uniqueUsers.length;
     
     const completedRecords = progressRecords.filter((p: any) => p.status === "COMPLETED");

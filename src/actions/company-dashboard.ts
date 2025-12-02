@@ -96,13 +96,16 @@ export async function getCompanyDashboardAnalytics(): Promise<{
     ];
 
     // Get all progress records for this company
-    const allProgress = await ModuleProgress.find({
+    const allProgressRaw = await ModuleProgress.find({
       companyId: companyId,
       moduleId: { $in: allModuleIds },
     })
       .populate("userId", "name email")
       .populate("moduleId", "meta")
       .lean();
+
+    // Filter out records with null userId (deleted users or data inconsistency)
+    const allProgress = allProgressRaw.filter((p) => p.userId != null);
 
     // Calculate overall statistics
     const completedProgress = allProgress.filter((p) => p.status === "COMPLETED");
@@ -131,8 +134,11 @@ export async function getCompanyDashboardAnalytics(): Promise<{
         : 0;
 
     // Calculate unique user engagement
-    const uniqueUsersStarted = new Set(allProgress.map((p) => p.userId.toString()))
-      .size;
+    const uniqueUsersStarted = new Set(
+      allProgress
+        .filter((p) => p.userId)
+        .map((p) => p.userId._id?.toString() || p.userId.toString())
+    ).size;
     const engagementRate =
       staffCount > 0 ? Math.round((uniqueUsersStarted / staffCount) * 100) : 0;
 
@@ -228,7 +234,11 @@ export async function getCompanyDashboardAnalytics(): Promise<{
       .slice(0, 8);
 
     // Get users who haven't started any training
-    const usersWithProgress = new Set(allProgress.map((p) => p.userId.toString()));
+    const usersWithProgress = new Set(
+      allProgress
+        .filter((p) => p.userId)
+        .map((p) => p.userId._id?.toString() || p.userId.toString())
+    );
     const inactiveUsers = allTeamMembers
       .filter(
         (user) =>

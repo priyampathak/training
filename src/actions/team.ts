@@ -230,12 +230,17 @@ export async function deleteTeamMember(
       };
     }
 
+    // Delete member's ModuleProgress records first (cleanup related data)
+    const ModuleProgress = (await import("@/src/models/ModuleProgress")).default;
+    const deletedProgressCount = await ModuleProgress.deleteMany({ userId: memberId });
+    console.log(`🧹 Deleted ${deletedProgressCount.deletedCount} progress records for team member ${memberId}`);
+
     // Hard delete
     await User.findByIdAndDelete(memberId);
 
     return {
       success: true,
-      message: "Team member deleted successfully",
+      message: `Team member and ${deletedProgressCount.deletedCount} progress records deleted successfully`,
     };
   } catch (error: any) {
     console.error("Delete team member error:", error);

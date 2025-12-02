@@ -69,9 +69,10 @@ interface EditModuleWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   module: any; // The module to edit
+  onSuccess?: () => void; // Callback after successful update
 }
 
-export function EditModuleWizard({ open, onOpenChange, module }: EditModuleWizardProps) {
+export function EditModuleWizard({ open, onOpenChange, module, onSuccess }: EditModuleWizardProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -153,28 +154,49 @@ export function EditModuleWizard({ open, onOpenChange, module }: EditModuleWizar
   };
 
   const onSubmit = async (data: UpdateModuleFormData) => {
-    if (!module) return;
+    if (!module) {
+      console.error("❌ No module provided for update");
+      return;
+    }
 
-    console.log("📤 Submitting updated module:", data);
+    console.log("📤 Submitting updated module for ID:", module._id);
+    console.log("📝 Form data:", {
+      title: data.title,
+      description: data.description,
+      category: data.category,
+      slidesCount: data.slides?.length,
+      quizCount: data.quiz?.length,
+      passingPoints: data.passingPoints,
+      isMandatory: data.isMandatory,
+    });
+    
     setLoading(true);
     setError("");
 
     try {
       // Calculate total points
       const totalPoints = data.quiz.reduce((sum, q) => sum + (q.points || 0), 0);
+      console.log("🔢 Total points calculated:", totalPoints);
       
       if (data.passingPoints > totalPoints) {
-        setError(`Passing points (${data.passingPoints}) cannot exceed total points (${totalPoints})`);
+        const errorMsg = `Passing points (${data.passingPoints}) cannot exceed total points (${totalPoints})`;
+        console.error("❌", errorMsg);
+        setError(errorMsg);
         setLoading(false);
         return;
       }
 
+      console.log("🚀 Calling updateTrainingModule...");
       const result = await updateTrainingModule(module._id, data);
       console.log("📥 Update result:", result);
 
       if (result.success) {
         alert("✅ Module updated successfully!");
         onOpenChange(false);
+        // Call onSuccess callback to reload modules in parent
+        if (onSuccess) {
+          onSuccess();
+        }
         router.refresh();
       } else {
         setError(result.message);

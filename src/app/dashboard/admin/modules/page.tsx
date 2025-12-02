@@ -575,6 +575,7 @@ export default function ModulesPage() {
         open={editModalOpen}
         onOpenChange={setEditModalOpen}
         module={editModule}
+        onSuccess={loadModules}
       />
     </div>
   );

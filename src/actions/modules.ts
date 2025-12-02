@@ -456,9 +456,17 @@ export async function updateTrainingModule(
   }
 ): Promise<ModuleResponse> {
   try {
+    console.log("🔄 Starting module update for:", moduleId);
+    console.log("📝 Update data:", {
+      title: data.title,
+      slidesCount: data.slides?.length,
+      quizCount: data.quiz?.length,
+    });
+
     const session = await getSession();
 
     if (!session || session.role !== "SUPER_ADMIN") {
+      console.error("❌ Unauthorized access attempt");
       return {
         success: false,
         message: "Unauthorized. Super admin access required.",
@@ -470,43 +478,42 @@ export async function updateTrainingModule(
     const module = await TrainingModule.findById(moduleId);
 
     if (!module) {
+      console.error("❌ Module not found:", moduleId);
       return { success: false, message: "Module not found" };
     }
+
+    console.log("✅ Found module:", module.meta.title);
 
     // Calculate total points
     const totalPoints = data.quiz.reduce((sum: number, q: any) => sum + (q.points || 0), 0);
     const passingPercentage = totalPoints > 0 ? Math.round((data.passingPoints / totalPoints) * 100) : 0;
 
-    // Update module fields
-    module.meta = {
-      title: data.title,
-      description: data.description,
-      category: data.category,
-      tags: data.tags,
-      difficulty: data.difficulty as "ROOKIE" | "PRO" | "LEGEND",
-    };
+    // Update module using findByIdAndUpdate for better reliability
+    const updatedModule = await TrainingModule.findByIdAndUpdate(
+      moduleId,
+      {
+        $set: {
+          "meta.title": data.title,
+          "meta.description": data.description,
+          "meta.category": data.category,
+          "meta.tags": data.tags,
+          "meta.difficulty": data.difficulty,
+          slides: data.slides,
+          quiz: data.quiz,
+          "assessment.totalPoints": totalPoints,
+          "assessment.passingPoints": data.passingPoints,
+          "assessment.passingPercentage": passingPercentage,
+          "settings.isMandatory": data.isMandatory,
+          "display.headingFontSize": data.headingFontSize,
+          "display.contentFontSize": data.contentFontSize,
+        },
+      },
+      { new: true, runValidators: true }
+    );
 
-    module.slides = data.slides;
-    module.quiz = data.quiz;
-
-    module.assessment = {
-      totalPoints,
-      passingPoints: data.passingPoints,
-      passingPercentage,
-    };
-
-    module.settings = {
-      isMandatory: data.isMandatory,
-      attemptsAllowed: module.settings.attemptsAllowed || -1,
-      certificateEnabled: module.settings.certificateEnabled || false,
-    };
-
-    module.display = {
-      headingFontSize: data.headingFontSize,
-      contentFontSize: data.contentFontSize,
-    };
-
-    await module.save();
+    if (!updatedModule) {
+      return { success: false, message: "Failed to update module" };
+    }
 
     revalidatePath("/dashboard/admin/modules");
 
@@ -520,8 +527,8 @@ export async function updateTrainingModule(
       success: true,
       message: "Module updated successfully",
       data: {
-        moduleId: module._id.toString(),
-        title: module.meta.title,
+        moduleId: updatedModule._id.toString(),
+        title: updatedModule.meta.title,
       },
     };
   } catch (error: any) {
