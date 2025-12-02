@@ -92,18 +92,6 @@ export default function CoursesPage() {
     }
   };
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case "ROOKIE":
-        return "bg-green-100 text-green-700 border-green-200";
-      case "PRO":
-        return "bg-blue-100 text-blue-700 border-blue-200";
-      case "LEGEND":
-        return "bg-purple-100 text-purple-700 border-purple-200";
-      default:
-        return "bg-gray-100 text-gray-700 border-gray-200";
-    }
-  };
 
   const getStatusBadge = (progress: any) => {
     if (!progress) {
@@ -251,7 +239,6 @@ export default function CoursesPage() {
                   <TableHead>Type</TableHead>
                   <TableHead>Module Title</TableHead>
                   <TableHead>Category</TableHead>
-                  <TableHead>Difficulty</TableHead>
                   <TableHead className="text-center">Slides</TableHead>
                   <TableHead className="text-center">Questions</TableHead>
                   <TableHead className="text-center">Total Points</TableHead>
@@ -301,18 +288,6 @@ export default function CoursesPage() {
                     <TableCell>
                       <Badge variant="outline" className="text-xs">
                         {module.category}
-                      </Badge>
-                    </TableCell>
-
-                    {/* Difficulty */}
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={`text-xs ${getDifficultyColor(
-                          module.difficulty
-                        )}`}
-                      >
-                        {module.difficulty}
                       </Badge>
                     </TableCell>
 

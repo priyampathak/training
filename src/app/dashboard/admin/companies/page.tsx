@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAllCompanies, updateCompanySubscription } from "@/src/actions/companies";
+import { getAllCompanies, updateCompanySubscription, deleteCompany } from "@/src/actions/companies";
 import { Button } from "@/src/components/ui/button";
 import {
   Card,
@@ -10,8 +10,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/src/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/src/components/ui/dialog";
 import { AddCompanyModal } from "@/src/components/AddCompanyModal";
-import { Plus, Building2, Users, Calendar, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Plus, Building2, Users, Calendar, CheckCircle, XCircle, Loader2, Trash2, Edit, AlertTriangle } from "lucide-react";
 import { formatDate } from "@/src/lib/utils";
 
 interface Company {
@@ -45,6 +53,9 @@ export default function CompaniesPage() {
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [companyToDelete, setCompanyToDelete] = useState<{ _id: string; name: string; userCount: number } | null>(null);
+  const [deletingCompany, setDeletingCompany] = useState(false);
 
   useEffect(() => {
     loadCompanies();
@@ -82,6 +93,38 @@ export default function CompaniesPage() {
       alert("An unexpected error occurred");
     } finally {
       setUpdatingStatus(null);
+    }
+  }
+
+  function handleDeleteClick(company: Company) {
+    setCompanyToDelete({
+      _id: company._id,
+      name: company.name,
+      userCount: company.userCount,
+    });
+    setDeleteModalOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!companyToDelete) return;
+
+    try {
+      setDeletingCompany(true);
+      const result = await deleteCompany(companyToDelete._id);
+      
+      if (result.success) {
+        setDeleteModalOpen(false);
+        setCompanyToDelete(null);
+        await loadCompanies();
+        alert("Company deleted successfully");
+      } else {
+        alert(result.message || "Failed to delete company");
+      }
+    } catch (err: any) {
+      console.error("Error deleting company:", err);
+      alert("An unexpected error occurred");
+    } finally {
+      setDeletingCompany(false);
     }
   }
 
@@ -331,9 +374,17 @@ export default function CompaniesPage() {
                         </div>
                       </td>
                       <td className="p-4">
-                        <Button variant="ghost" size="sm">
-                          View
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteClick(company)}
+                            title="Delete Company"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -346,6 +397,73 @@ export default function CompaniesPage() {
 
       {/* Add Company Modal */}
       <AddCompanyModal open={modalOpen} onOpenChange={setModalOpen} />
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              <DialogTitle>Delete Company</DialogTitle>
+            </div>
+            <DialogDescription>
+              This action cannot be undone. This will permanently delete the company and all associated data.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {companyToDelete && (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-destructive/10 p-4 border border-destructive/20">
+                <p className="font-medium text-sm mb-2">You are about to delete:</p>
+                <p className="text-lg font-bold">{companyToDelete.name}</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  This will also affect <span className="font-semibold text-destructive">{companyToDelete.userCount} user(s)</span> associated with this company.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">What will happen:</p>
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>Company will be soft-deleted from the system</li>
+                  <li>All users will be deactivated</li>
+                  <li>Subscription will be cancelled</li>
+                  <li>Company data will be archived</li>
+                </ul>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteModalOpen(false);
+                setCompanyToDelete(null);
+              }}
+              disabled={deletingCompany}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={deletingCompany}
+            >
+              {deletingCompany ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Company
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

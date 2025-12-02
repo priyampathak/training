@@ -62,18 +62,6 @@ export default async function CompanyModulesPage() {
 
   const { companyModules, globalModules, companyName, stats } = result.data;
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case "ROOKIE":
-        return "bg-green-100 text-green-700 border-green-200";
-      case "PRO":
-        return "bg-blue-100 text-blue-700 border-blue-200";
-      case "LEGEND":
-        return "bg-purple-100 text-purple-700 border-purple-200";
-      default:
-        return "bg-gray-100 text-gray-700 border-gray-200";
-    }
-  };
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -128,12 +116,6 @@ export default async function CompanyModulesPage() {
             <Badge variant="outline" className="gap-1">
               {getCategoryIcon(module.category)}
               {module.category}
-            </Badge>
-            <Badge
-              variant="outline"
-              className={getDifficultyColor(module.difficulty)}
-            >
-              {module.difficulty}
             </Badge>
             <Badge variant="secondary">
               {isCompanyModule ? "Company" : "Global"}

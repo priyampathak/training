@@ -6,6 +6,7 @@ import {
   addTeamMember,
   deleteTeamMember,
   toggleTeamMemberStatus,
+  resetTeamMemberPassword,
 } from "@/src/actions/team";
 import { Button } from "@/src/components/ui/button";
 import {
@@ -40,6 +41,7 @@ import {
   XCircle,
   Shield,
   User,
+  Key,
 } from "lucide-react";
 
 interface TeamMember {
@@ -58,7 +60,10 @@ export default function TeamPage() {
   const [companyName, setCompanyName] = useState("");
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [resetPasswordModalOpen, setResetPasswordModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState("");
 
   // Form state
   const [formData, setFormData] = useState({
@@ -151,6 +156,35 @@ export default function TeamPage() {
       console.error("Toggle status error:", error);
       alert("An error occurred while toggling team member status");
     }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedMemberId) return;
+
+    setSubmitting(true);
+    try {
+      const result = await resetTeamMemberPassword(selectedMemberId, newPassword);
+      if (result.success) {
+        alert(result.message);
+        setResetPasswordModalOpen(false);
+        setNewPassword("");
+        setSelectedMemberId(null);
+      } else {
+        alert(result.message);
+      }
+    } catch (error) {
+      console.error("Reset password error:", error);
+      alert("An error occurred while resetting password");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openResetPasswordModal = (memberId: string) => {
+    setSelectedMemberId(memberId);
+    setNewPassword("");
+    setResetPasswordModalOpen(true);
   };
 
   if (loading) {
@@ -298,6 +332,14 @@ export default function TeamPage() {
                           <Button
                             variant="outline"
                             size="sm"
+                            onClick={() => openResetPasswordModal(member._id)}
+                            title="Reset Password"
+                          >
+                            <Key className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => handleToggleStatus(member._id)}
                           >
                             {member.isActive ? (
@@ -421,6 +463,61 @@ export default function TeamPage() {
                   <>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Member
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Modal */}
+      <Dialog open={resetPasswordModalOpen} onOpenChange={setResetPasswordModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>
+              Enter a new password for this team member
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <div>
+              <Label htmlFor="new-password">New Password *</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Minimum 4 characters"
+                required
+                minLength={4}
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setResetPasswordModalOpen(false);
+                  setNewPassword("");
+                  setSelectedMemberId(null);
+                }}
+                disabled={submitting}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Resetting...
+                  </>
+                ) : (
+                  <>
+                    <Key className="h-4 w-4 mr-2" />
+                    Reset Password
                   </>
                 )}
               </Button>

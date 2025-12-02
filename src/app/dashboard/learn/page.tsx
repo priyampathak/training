@@ -54,18 +54,6 @@ export default async function StaffDashboard() {
   const { user, company, stats, availableModules, completedModules, inProgressModules } =
     result.data;
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case "ROOKIE":
-        return "bg-green-100 text-green-700 border-green-200";
-      case "PRO":
-        return "bg-blue-100 text-blue-700 border-blue-200";
-      case "LEGEND":
-        return "bg-purple-100 text-purple-700 border-purple-200";
-      default:
-        return "bg-gray-100 text-gray-700 border-gray-200";
-    }
-  };
 
   return (
     <div className="space-y-8">
@@ -193,12 +181,6 @@ export default async function StaffDashboard() {
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant="outline">{module.category}</Badge>
-                      <Badge
-                        variant="outline"
-                        className={getDifficultyColor(module.difficulty)}
-                      >
-                        {module.difficulty}
-                      </Badge>
                     </div>
                     <div className="text-sm text-muted-foreground">
                       Attempt {module.progress?.attemptCount || 0} •{" "}
@@ -245,12 +227,6 @@ export default async function StaffDashboard() {
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant="outline">{module.category}</Badge>
-                      <Badge
-                        variant="outline"
-                        className={getDifficultyColor(module.difficulty)}
-                      >
-                        {module.difficulty}
-                      </Badge>
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">

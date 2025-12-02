@@ -305,3 +305,66 @@ export async function toggleTeamMemberStatus(
   }
 }
 
+/**
+ * RESET TEAM MEMBER PASSWORD (Company Admin Only)
+ */
+export async function resetTeamMemberPassword(
+  memberId: string,
+  newPassword: string
+): Promise<TeamResponse> {
+  try {
+    const session = await getSession();
+
+    if (!session || session.role !== "COMPANY_ADMIN") {
+      return { success: false, message: "Unauthorized" };
+    }
+
+    if (!session.companyId) {
+      return { success: false, message: "No company assigned" };
+    }
+
+    // Validate password
+    if (!newPassword || newPassword.length < 4) {
+      return {
+        success: false,
+        message: "Password must be at least 4 characters",
+      };
+    }
+
+    const { User } = await getModels();
+
+    // Find the member
+    const member = await User.findById(memberId);
+
+    if (!member) {
+      return { success: false, message: "Team member not found" };
+    }
+
+    // Verify the member belongs to this company
+    if (member.companyId?.toString() !== session.companyId) {
+      return {
+        success: false,
+        message: "You can only reset passwords for members from your company",
+      };
+    }
+
+    // Hash password using the same method as user creation
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    member.password = hashedPassword;
+    await member.save();
+
+    return {
+      success: true,
+      message: "Password reset successfully",
+    };
+  } catch (error: any) {
+    console.error("Reset team member password error:", error);
+    return {
+      success: false,
+      message: "Failed to reset password",
+    };
+  }
+}
+

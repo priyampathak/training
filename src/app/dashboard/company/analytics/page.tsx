@@ -22,6 +22,13 @@ import {
 } from "@/src/components/ui/dialog";
 import { Badge } from "@/src/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/src/components/ui/select";
+import {
   BarChart,
   Bar,
   LineChart,
@@ -103,6 +110,7 @@ export default function CompanyAnalyticsPage() {
   const [userPerformance, setUserPerformance] = useState<UserPerformance[]>([]);
   const [topPerformers, setTopPerformers] = useState<UserPerformance[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [timeFilter, setTimeFilter] = useState<string>("all");
 
   // Modal state
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -115,7 +123,7 @@ export default function CompanyAnalyticsPage() {
   const loadAnalytics = async () => {
     setLoading(true);
     try {
-      const result = await getCompanyAnalytics();
+      const result = await getCompanyAnalytics(timeFilter);
 
       if (result.success && result.data) {
         setCompanyName(result.data.companyName);
@@ -137,7 +145,7 @@ export default function CompanyAnalyticsPage() {
 
   useEffect(() => {
     loadAnalytics();
-  }, []);
+  }, [timeFilter]);
 
   const handleViewDetails = async (moduleId: string) => {
     setSelectedModule(moduleId);
@@ -197,11 +205,28 @@ export default function CompanyAnalyticsPage() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">Company Analytics</h1>
-        <p className="text-muted-foreground mt-1">
-          Real-time analytics for {companyName}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Company Analytics</h1>
+          <p className="text-muted-foreground mt-1">
+            Real-time analytics for {companyName}
+          </p>
+        </div>
+        <div className="w-48">
+          <Select value={timeFilter} onValueChange={setTimeFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Time Period" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Time</SelectItem>
+              <SelectItem value="7days">Last 7 Days</SelectItem>
+              <SelectItem value="30days">Last 30 Days</SelectItem>
+              <SelectItem value="3months">Last 3 Months</SelectItem>
+              <SelectItem value="6months">Last 6 Months</SelectItem>
+              <SelectItem value="1year">Last Year</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Overview Cards */}

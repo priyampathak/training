@@ -43,7 +43,7 @@ export function getNavItems(role: UserRole): NavItem[] {
           icon: Users,
         },
         {
-          title: "Global Modules",
+          title: "Modules",
           href: "/dashboard/admin/modules",
           icon: BookOpen,
         },
@@ -62,14 +62,9 @@ export function getNavItems(role: UserRole): NavItem[] {
           icon: LayoutDashboard,
         },
         {
-          title: "Create Training",
+          title: "Trainings",
           href: "/dashboard/company/training",
           icon: BookOpen,
-        },
-        {
-          title: "Training Modules",
-          href: "/dashboard/company/modules",
-          icon: BarChart3,
         },
         {
           title: "Team Members",

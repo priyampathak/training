@@ -10,9 +10,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/src/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/src/components/ui/select";
 import { AddUserModal } from "@/src/components/AddUserModal";
 import { ResetPasswordModal } from "@/src/components/ResetPasswordModal";
-import { Plus, Users as UsersIcon, UserCheck, UserX, Loader2, Trash2, Building2, XCircle, Key } from "lucide-react";
+import { Plus, Users as UsersIcon, UserCheck, UserX, Loader2, Trash2, Building2, XCircle, Key, Filter } from "lucide-react";
 import { formatDate } from "@/src/lib/utils";
 
 interface User {
@@ -42,6 +49,11 @@ export default function UsersPage() {
     name: string;
     email: string;
   } | null>(null);
+
+  // Filter states
+  const [filterRole, setFilterRole] = useState<string>("all");
+  const [filterCompany, setFilterCompany] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
 
   useEffect(() => {
     loadData();
@@ -181,6 +193,29 @@ export default function UsersPage() {
     );
   }
 
+  // Get unique companies for filter
+  const uniqueCompanies = [...new Set(users.map(u => u.companyName).filter(Boolean))].sort();
+
+  // Apply filters
+  const filteredUsers = users.filter((user) => {
+    // Filter by role
+    if (filterRole !== "all" && user.role !== filterRole) return false;
+    
+    // Filter by company
+    if (filterCompany !== "all") {
+      if (filterCompany === "no-company" && user.companyName) return false;
+      if (filterCompany !== "no-company" && user.companyName !== filterCompany) return false;
+    }
+    
+    // Filter by status
+    if (filterStatus !== "all") {
+      if (filterStatus === "active" && !user.isActive) return false;
+      if (filterStatus === "inactive" && user.isActive) return false;
+    }
+    
+    return true;
+  });
+
   const activeUsers = users.filter(u => u.isActive);
   const superAdmins = users.filter(u => u.role === "SUPER_ADMIN");
   const companyAdmins = users.filter(u => u.role === "COMPANY_ADMIN");
@@ -257,6 +292,92 @@ export default function UsersPage() {
         </Card>
       </div>
 
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Filter className="h-5 w-5 text-muted-foreground" />
+            <CardTitle>Filters</CardTitle>
+          </div>
+          <CardDescription>
+            Filter users by role, company, and status
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Role Filter */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Role</label>
+              <Select value={filterRole} onValueChange={setFilterRole}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Roles" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles ({users.length})</SelectItem>
+                  <SelectItem value="SUPER_ADMIN">Super Admin ({superAdmins.length})</SelectItem>
+                  <SelectItem value="COMPANY_ADMIN">Company Admin ({companyAdmins.length})</SelectItem>
+                  <SelectItem value="STAFF">Staff ({staff.length})</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Company Filter */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Company</label>
+              <Select value={filterCompany} onValueChange={setFilterCompany}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Companies" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Companies</SelectItem>
+                  <SelectItem value="no-company">No Company</SelectItem>
+                  {uniqueCompanies.map((company) => (
+                    <SelectItem key={company} value={company as string}>
+                      {company}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Status Filter */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Status</label>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active ({activeUsers.length})</SelectItem>
+                  <SelectItem value="inactive">Inactive ({users.length - activeUsers.length})</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          {/* Show filter results count */}
+          {(filterRole !== "all" || filterCompany !== "all" || filterStatus !== "all") && (
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Showing {filteredUsers.length} of {users.length} users
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setFilterRole("all");
+                  setFilterCompany("all");
+                  setFilterStatus("all");
+                }}
+              >
+                Clear Filters
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Users Table */}
       <Card>
         <CardHeader>
@@ -292,8 +413,15 @@ export default function UsersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((user) => (
-                    <tr key={user._id} className="border-b hover:bg-muted/50">
+                  {filteredUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center">
+                        <p className="text-muted-foreground">No users match the selected filters</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredUsers.map((user) => (
+                      <tr key={user._id} className="border-b hover:bg-muted/50">
                       <td className="p-4">
                         <div>
                           <div className="font-medium">{user.name}</div>
@@ -397,7 +525,7 @@ export default function UsersPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )))}
                 </tbody>
               </table>
             </div>

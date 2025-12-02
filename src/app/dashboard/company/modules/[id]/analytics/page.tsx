@@ -59,7 +59,6 @@ export default async function ModuleAnalyticsPage({
               <li>✓ Question-by-question performance</li>
               <li>✓ Time spent on each slide</li>
               <li>✓ Staff performance leaderboard</li>
-              <li>✓ Difficulty analysis</li>
               <li>✓ Engagement metrics</li>
             </ul>
           </div>

@@ -10,6 +10,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/src/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/src/components/ui/select";
 import { CreateModuleWizard } from "@/src/components/CreateModuleWizard";
 import { PreviewModuleModal } from "@/src/components/PreviewModuleModal";
 import { EditModuleWizard } from "@/src/components/EditModuleWizard";
@@ -24,6 +31,7 @@ import {
   Presentation,
   HelpCircle,
   Eye,
+  Filter,
 } from "lucide-react";
 import { formatDate } from "@/src/lib/utils";
 
@@ -73,6 +81,11 @@ export default function ModulesPage() {
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [editModule, setEditModule] = useState<TrainingModule | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  
+  // Filter states
+  const [filterAssignment, setFilterAssignment] = useState<string>("all");
+  const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
 
   useEffect(() => {
     loadModules();
@@ -150,18 +163,6 @@ export default function ModulesPage() {
     setEditModalOpen(true);
   }
 
-  function getDifficultyColor(difficulty: string) {
-    switch (difficulty) {
-      case "ROOKIE":
-        return "bg-green-100 text-green-700";
-      case "PRO":
-        return "bg-blue-100 text-blue-700";
-      case "LEGEND":
-        return "bg-purple-100 text-purple-700";
-      default:
-        return "bg-gray-100 text-gray-700";
-    }
-  }
 
   if (loading) {
     return (
@@ -206,10 +207,41 @@ export default function ModulesPage() {
     );
   }
 
+  // Sort modules: assigned to companies first, then global
+  const sortedModules = [...modules].sort((a, b) => {
+    // First sort by assignment (assigned companies come first)
+    if (!a.isGlobal && b.isGlobal) return -1;
+    if (a.isGlobal && !b.isGlobal) return 1;
+    // Then by creation date (newest first)
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
+  // Apply filters
+  const filteredModules = sortedModules.filter((module) => {
+    // Filter by assignment
+    if (filterAssignment !== "all") {
+      if (filterAssignment === "global" && !module.isGlobal) return false;
+      if (filterAssignment === "company" && module.isGlobal) return false;
+    }
+    
+    // Filter by category
+    if (filterCategory !== "all" && module.meta.category !== filterCategory) return false;
+    
+    // Filter by status
+    if (filterStatus !== "all") {
+      if (filterStatus === "active" && !module.isActive) return false;
+      if (filterStatus === "inactive" && module.isActive) return false;
+    }
+    
+    return true;
+  });
+
   const activeModules = modules.filter((m) => m.isActive);
   const totalSlides = modules.reduce((sum, m) => sum + (m.slides?.length || 0), 0);
   const totalQuestions = modules.reduce((sum, m) => sum + (m.quiz?.length || 0), 0);
   const categories = [...new Set(modules.map((m) => m.meta.category))];
+  const companyModulesCount = modules.filter((m) => !m.isGlobal).length;
+  const globalModulesCount = modules.filter((m) => m.isGlobal).length;
 
   return (
     <div className="space-y-6">
@@ -282,12 +314,96 @@ export default function ModulesPage() {
         </Card>
       </div>
 
+      {/* Filters Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Filter className="h-5 w-5 text-muted-foreground" />
+            <CardTitle>Filters</CardTitle>
+          </div>
+          <CardDescription>
+            Filter modules by assignment, category, difficulty, and status
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Assignment Filter */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Assignment</label>
+              <Select value={filterAssignment} onValueChange={setFilterAssignment}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All ({modules.length})</SelectItem>
+                  <SelectItem value="company">Company ({companyModulesCount})</SelectItem>
+                  <SelectItem value="global">Global ({globalModulesCount})</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Category Filter */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Category</label>
+              <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Status Filter */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Status</label>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          {/* Show filter results count */}
+          {(filterAssignment !== "all" || filterCategory !== "all" || filterStatus !== "all") && (
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Showing {filteredModules.length} of {modules.length} modules
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setFilterAssignment("all");
+                  setFilterCategory("all");
+                  setFilterStatus("all");
+                }}
+              >
+                Clear Filters
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Modules Table */}
       <Card>
         <CardHeader>
           <CardTitle>All Training Modules</CardTitle>
           <CardDescription>
-            View and manage all global training modules
+            Company-assigned modules are shown first, followed by global modules
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -311,15 +427,21 @@ export default function ModulesPage() {
                     <th className="text-left p-4 font-medium">Module</th>
                     <th className="text-left p-4 font-medium">Assignment</th>
                     <th className="text-left p-4 font-medium">Category</th>
-                    <th className="text-left p-4 font-medium">Difficulty</th>
                     <th className="text-left p-4 font-medium">Status</th>
                     <th className="text-left p-4 font-medium">Created By</th>
                     <th className="text-left p-4 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {modules.map((module) => (
-                    <tr key={module._id} className="border-b hover:bg-muted/50">
+                  {filteredModules.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center">
+                        <p className="text-muted-foreground">No modules match the selected filters</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredModules.map((module) => (
+                      <tr key={module._id} className="border-b hover:bg-muted/50">
                       <td className="p-4">
                         <div>
                           <div className="font-medium">{module.meta.title}</div>
@@ -359,15 +481,6 @@ export default function ModulesPage() {
                       </td>
                       <td className="p-4">
                         <span className="text-sm">{module.meta.category}</span>
-                      </td>
-                      <td className="p-4">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getDifficultyColor(
-                            module.meta.difficulty
-                          )}`}
-                        >
-                          {module.meta.difficulty}
-                        </span>
                       </td>
                       <td className="p-4">
                         <Button
@@ -439,7 +552,7 @@ export default function ModulesPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )))}
                 </tbody>
               </table>
             </div>

@@ -233,18 +233,6 @@ export function EditModuleWizard({ open, onOpenChange, module }: EditModuleWizar
                   <option value="HR">HR</option>
                 </select>
               </div>
-
-              <div className="space-y-2">
-                <Label>Difficulty *</Label>
-                <select
-                  {...register("difficulty")}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-                >
-                  <option value="ROOKIE">ROOKIE</option>
-                  <option value="PRO">PRO</option>
-                  <option value="LEGEND">LEGEND</option>
-                </select>
-              </div>
             </div>
 
             <div className="space-y-2">

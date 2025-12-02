@@ -191,7 +191,6 @@ export function CreateModuleWizard({ open, onOpenChange }: CreateModuleWizardPro
           "meta.title",
           "meta.description",
           "meta.category",
-          "meta.difficulty",
         ];
         break;
       case 2:
@@ -314,25 +313,6 @@ export function CreateModuleWizard({ open, onOpenChange }: CreateModuleWizardPro
                   <option value="Management">Management</option>
                   <option value="HR">HR</option>
                 </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="meta.difficulty">Difficulty *</Label>
-                <div className="flex gap-2">
-                  {(["ROOKIE", "PRO", "LEGEND"] as const).map((level) => (
-                    <label key={level} className="flex-1">
-                      <input
-                        type="radio"
-                        {...register("meta.difficulty")}
-                        value={level}
-                        className="sr-only peer"
-                      />
-                      <div className="px-3 py-2 text-center text-xs font-medium border rounded-md cursor-pointer peer-checked:bg-primary peer-checked:text-primary-foreground peer-checked:border-primary">
-                        {level}
-                      </div>
-                    </label>
-                  ))}
-                </div>
               </div>
             </div>
 
@@ -661,7 +641,6 @@ export function CreateModuleWizard({ open, onOpenChange }: CreateModuleWizardPro
               <div className="text-sm space-y-1">
                 <p><span className="font-medium">Title:</span> {watch("meta.title") || "N/A"}</p>
                 <p><span className="font-medium">Category:</span> {watch("meta.category")}</p>
-                <p><span className="font-medium">Difficulty:</span> {watch("meta.difficulty")}</p>
                 <p><span className="font-medium">Slides:</span> {slideFields.length}</p>
                 <p><span className="font-medium">Questions:</span> {quizFields.length}</p>
                 <p><span className="font-medium">Total Points:</span> {totalPoints}</p>

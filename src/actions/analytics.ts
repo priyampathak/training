@@ -22,9 +22,11 @@ interface AnalyticsResponse {
 /**
  * GET COMPANY ANALYTICS OVERVIEW
  */
-export async function getCompanyAnalytics(): Promise<AnalyticsResponse> {
+export async function getCompanyAnalytics(
+  timeFilter: string = "all"
+): Promise<AnalyticsResponse> {
   try {
-    console.log("🔍 Getting company analytics...");
+    console.log("🔍 Getting company analytics with filter:", timeFilter);
     const session = await getSession();
 
     if (!session || session.role !== "COMPANY_ADMIN") {
@@ -37,6 +39,33 @@ export async function getCompanyAnalytics(): Promise<AnalyticsResponse> {
 
     const { User, TrainingModule, ModuleProgress, Company } = await getModels();
 
+    // Calculate date range based on filter
+    let dateFilter: any = {};
+    if (timeFilter !== "all") {
+      const now = new Date();
+      let startDate = new Date();
+
+      switch (timeFilter) {
+        case "7days":
+          startDate.setDate(now.getDate() - 7);
+          break;
+        case "30days":
+          startDate.setDate(now.getDate() - 30);
+          break;
+        case "3months":
+          startDate.setMonth(now.getMonth() - 3);
+          break;
+        case "6months":
+          startDate.setMonth(now.getMonth() - 6);
+          break;
+        case "1year":
+          startDate.setFullYear(now.getFullYear() - 1);
+          break;
+      }
+
+      dateFilter = { createdAt: { $gte: startDate } };
+    }
+
     // Get company details
     const company = await Company.findById(session.companyId).lean();
     if (!company) {
@@ -48,6 +77,7 @@ export async function getCompanyAnalytics(): Promise<AnalyticsResponse> {
       companyId: session.companyId,
       isActive: true,
       isDeleted: false,
+      ...dateFilter,
     }).lean();
 
     const totalStaff = allStaff.length;
@@ -57,20 +87,28 @@ export async function getCompanyAnalytics(): Promise<AnalyticsResponse> {
       assignedCompanyId: session.companyId,
       isGlobal: false,
       isActive: true,
+      ...dateFilter,
     }).lean();
 
     const globalModules = await TrainingModule.find({
       isGlobal: true,
       isActive: true,
+      ...dateFilter,
     }).lean();
 
     const allModules = [...companyModules, ...globalModules];
     const totalModules = allModules.length;
 
-    // Get all progress records for this company
-    const allProgress = await ModuleProgress.find({
+    // Get all progress records for this company with date filter
+    const progressQuery: any = {
       companyId: session.companyId,
-    }).lean();
+    };
+
+    if (timeFilter !== "all") {
+      progressQuery.createdAt = dateFilter.createdAt;
+    }
+
+    const allProgress = await ModuleProgress.find(progressQuery).lean();
 
     // Calculate overall statistics
     const completedModules = allProgress.filter((p) => p.status === "COMPLETED");
@@ -193,11 +231,17 @@ export async function getCompanyAnalytics(): Promise<AnalyticsResponse> {
       .sort((a, b) => b.completionRate - a.completionRate)
       .slice(0, 5);
 
-    // Recent activity (last 10 completions)
-    const recentActivity = await ModuleProgress.find({
+    // Recent activity (last 10 completions) with date filter
+    const activityQuery: any = {
       companyId: session.companyId,
       status: "COMPLETED",
-    })
+    };
+
+    if (timeFilter !== "all") {
+      activityQuery.completedAt = dateFilter.createdAt;
+    }
+
+    const recentActivity = await ModuleProgress.find(activityQuery)
       .sort({ completedAt: -1 })
       .limit(10)
       .populate("userId", "name email")

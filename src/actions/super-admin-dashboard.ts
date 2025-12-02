@@ -287,7 +287,7 @@ export async function getSuperAdminDashboard() {
   }
 }
 
-export async function getSuperAdminAnalytics() {
+export async function getSuperAdminAnalytics(timeFilter?: string) {
   try {
     const session = await getSession();
 
@@ -301,8 +301,35 @@ export async function getSuperAdminAnalytics() {
     const { User, Company, TrainingModule, ModuleProgress, Plan } = await getModels();
     await connectDB();
 
+    // Calculate date range based on time filter
+    const now = new Date();
+    let startDate: Date | null = null;
+
+    switch (timeFilter) {
+      case "weekly":
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case "monthly":
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case "quarterly":
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      case "6months":
+        startDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
+        break;
+      case "yearly":
+        startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        startDate = null; // All time
+    }
+
+    // Create date filter for queries
+    const dateFilter = startDate ? { createdAt: { $gte: startDate } } : {};
+
     // 1. Detailed Company Analytics
-    const companies = await Company.find({ isDeleted: false })
+    const companies = await Company.find({ isDeleted: false, ...dateFilter })
       .select("name subscription limits createdAt")
       .lean();
 
@@ -335,10 +362,13 @@ export async function getSuperAdminAnalytics() {
 
         const totalModules = companyModules + globalModules;
 
-        // Get progress stats
+        // Get progress stats (with date filter on completedAt for completed modules)
+        const progressDateFilter = startDate ? { completedAt: { $gte: startDate } } : {};
+        
         const completedProgress = await ModuleProgress.countDocuments({
           companyId: companyId,
           status: "COMPLETED",
+          ...progressDateFilter,
         });
 
         const inProgressProgress = await ModuleProgress.countDocuments({
@@ -350,6 +380,7 @@ export async function getSuperAdminAnalytics() {
           companyId: companyId,
           status: "COMPLETED",
           isPassed: true,
+          ...progressDateFilter,
         });
 
         const totalProgress = completedProgress + inProgressProgress;
@@ -365,8 +396,13 @@ export async function getSuperAdminAnalytics() {
             : 0;
 
         // Average score
+        const avgScoreMatchFilter: any = { companyId: companyId, status: "COMPLETED" };
+        if (startDate) {
+          avgScoreMatchFilter.completedAt = { $gte: startDate };
+        }
+        
         const avgScoreResult = await ModuleProgress.aggregate([
-          { $match: { companyId: companyId, status: "COMPLETED" } },
+          { $match: avgScoreMatchFilter },
           {
             $group: {
               _id: null,
@@ -411,7 +447,7 @@ export async function getSuperAdminAnalytics() {
     );
 
     // 2. User Analytics (all users)
-    const allUsers = await User.find({ isDeleted: false })
+    const allUsers = await User.find({ isDeleted: false, ...dateFilter })
       .select("name email role companyId isActive lastLoginAt createdAt")
       .populate("companyId", "name")
       .lean();
@@ -420,9 +456,12 @@ export async function getSuperAdminAnalytics() {
       allUsers.map(async (user) => {
         const userId = user._id;
 
+        const progressDateFilter = startDate ? { completedAt: { $gte: startDate } } : {};
+
         const completedModules = await ModuleProgress.countDocuments({
           userId: userId,
           status: "COMPLETED",
+          ...progressDateFilter,
         });
 
         const inProgressModules = await ModuleProgress.countDocuments({
@@ -434,14 +473,21 @@ export async function getSuperAdminAnalytics() {
           userId: userId,
           status: "COMPLETED",
           isPassed: true,
+          ...progressDateFilter,
         });
 
         const totalAttempts = await ModuleProgress.countDocuments({
           userId: userId,
+          ...(startDate ? { createdAt: { $gte: startDate } } : {}),
         });
 
+        const userAvgScoreFilter: any = { userId: userId, status: "COMPLETED" };
+        if (startDate) {
+          userAvgScoreFilter.completedAt = { $gte: startDate };
+        }
+
         const avgScoreResult = await ModuleProgress.aggregate([
-          { $match: { userId: userId, status: "COMPLETED" } },
+          { $match: userAvgScoreFilter },
           {
             $group: {
               _id: null,
@@ -471,8 +517,8 @@ export async function getSuperAdminAnalytics() {
       })
     );
 
-    // 3. Module Analytics (all modules)
-    const allModules = await TrainingModule.find({ isActive: true })
+    // 3. Module Analytics (all modules created within time filter)
+    const allModules = await TrainingModule.find({ isActive: true, ...dateFilter })
       .select("meta assignedCompanyId isGlobal assessment createdAt")
       .populate("assignedCompanyId", "name")
       .lean();
@@ -481,13 +527,18 @@ export async function getSuperAdminAnalytics() {
       allModules.map(async (module) => {
         const moduleId = module._id;
 
+        const progressDateFilter = startDate ? { completedAt: { $gte: startDate } } : {};
+        const attemptDateFilter = startDate ? { createdAt: { $gte: startDate } } : {};
+
         const totalAttempts = await ModuleProgress.countDocuments({
           moduleId: moduleId,
+          ...attemptDateFilter,
         });
 
         const completedCount = await ModuleProgress.countDocuments({
           moduleId: moduleId,
           status: "COMPLETED",
+          ...progressDateFilter,
         });
 
         const inProgressCount = await ModuleProgress.countDocuments({
@@ -499,6 +550,7 @@ export async function getSuperAdminAnalytics() {
           moduleId: moduleId,
           status: "COMPLETED",
           isPassed: true,
+          ...progressDateFilter,
         });
 
         const failedCount = completedCount - passedCount;
@@ -513,8 +565,13 @@ export async function getSuperAdminAnalytics() {
             ? Math.round((passedCount / completedCount) * 100)
             : 0;
 
+        const moduleAvgScoreFilter: any = { moduleId: moduleId, status: "COMPLETED" };
+        if (startDate) {
+          moduleAvgScoreFilter.completedAt = { $gte: startDate };
+        }
+
         const avgScoreResult = await ModuleProgress.aggregate([
-          { $match: { moduleId: moduleId, status: "COMPLETED" } },
+          { $match: moduleAvgScoreFilter },
           {
             $group: {
               _id: null,
@@ -581,6 +638,111 @@ export async function getSuperAdminAnalytics() {
       })
     );
 
+    // 5. Revenue Analytics
+    // Get all companies with active subscriptions
+    const activeCompaniesWithPlans = await Company.find({
+      isDeleted: false,
+      "subscription.status": "ACTIVE",
+      ...dateFilter,
+    })
+      .populate("subscription.planId")
+      .lean();
+
+    // Calculate total MRR (Monthly Recurring Revenue)
+    const totalMRR = activeCompaniesWithPlans.reduce((sum, company) => {
+      const plan = company.subscription?.planId as any;
+      return sum + (plan?.price || 0);
+    }, 0);
+
+    // Calculate ARR (Annual Recurring Revenue)
+    const totalARR = totalMRR * 12;
+
+    // Revenue by plan
+    const revenueByPlan = planStats.map((plan) => ({
+      planName: plan.planName,
+      activeSubscriptions: plan.activeSubscriptions,
+      monthlyRevenue: plan.totalRevenue,
+      annualRevenue: plan.totalRevenue * 12,
+    }));
+
+    // New subscriptions in time period (if filtered)
+    const newSubscriptionsCount = startDate
+      ? await Company.countDocuments({
+          isDeleted: false,
+          "subscription.status": "ACTIVE",
+          createdAt: { $gte: startDate },
+        })
+      : 0;
+
+    // Churned subscriptions (companies that became inactive in time period)
+    const churnedSubscriptionsCount = startDate
+      ? await Company.countDocuments({
+          isDeleted: false,
+          "subscription.status": { $ne: "ACTIVE" },
+          updatedAt: { $gte: startDate },
+        })
+      : 0;
+
+    // Average Revenue Per User (ARPU)
+    const totalActiveSubscriptions = activeCompaniesWithPlans.length;
+    const arpu = totalActiveSubscriptions > 0 ? totalMRR / totalActiveSubscriptions : 0;
+
+    // Revenue by subscription status
+    const allCompaniesWithStatus = await Company.find({ isDeleted: false, ...dateFilter })
+      .populate("subscription.planId")
+      .lean();
+
+    const revenueByStatus = {
+      active: 0,
+      trial: 0,
+      cancelled: 0,
+      expired: 0,
+    };
+
+    allCompaniesWithStatus.forEach((company) => {
+      const plan = company.subscription?.planId as any;
+      const revenue = plan?.price || 0;
+      const status = company.subscription?.status?.toLowerCase() || "cancelled";
+      
+      if (status === "active") revenueByStatus.active += revenue;
+      else if (status === "trial") revenueByStatus.trial += revenue;
+      else if (status === "cancelled") revenueByStatus.cancelled += revenue;
+      else if (status === "expired") revenueByStatus.expired += revenue;
+    });
+
+    // Top revenue generating companies
+    const topRevenueCompanies = activeCompaniesWithPlans
+      .map((company) => {
+        const plan = company.subscription?.planId as any;
+        const subscription = company.subscription as any;
+        return {
+          companyId: company._id.toString(),
+          companyName: company.name,
+          planName: plan?.name || "N/A",
+          monthlyRevenue: plan?.price || 0,
+          annualRevenue: (plan?.price || 0) * 12,
+          subscriptionStatus: subscription?.status || "N/A",
+          startDate: subscription?.startDate || company.createdAt,
+        };
+      })
+      .sort((a, b) => b.monthlyRevenue - a.monthlyRevenue)
+      .slice(0, 10);
+
+    const revenueAnalytics = {
+      totalMRR,
+      totalARR,
+      arpu: Math.round(arpu),
+      totalActiveSubscriptions,
+      newSubscriptions: newSubscriptionsCount,
+      churnedSubscriptions: churnedSubscriptionsCount,
+      churnRate: totalActiveSubscriptions > 0 
+        ? Math.round((churnedSubscriptionsCount / totalActiveSubscriptions) * 100) 
+        : 0,
+      revenueByPlan,
+      revenueByStatus,
+      topRevenueCompanies,
+    };
+
     return {
       success: true,
       message: "Super admin analytics fetched successfully",
@@ -593,6 +755,7 @@ export async function getSuperAdminAnalytics() {
           (a, b) => b.completedCount - a.completedCount
         ),
         planStats,
+        revenueAnalytics,
       },
     };
   } catch (error: any) {

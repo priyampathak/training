@@ -102,8 +102,8 @@ export async function getCompanyTrainingModules(): Promise<ModuleResponse> {
       return { success: false, message: "Company not found" };
     }
 
-    // Get only modules assigned to this company (not global)
-    const modules = await TrainingModule.find({
+    // Get company modules AND global modules
+    const companyModules = await TrainingModule.find({
       assignedCompanyId: session.companyId,
       isGlobal: false,
       isActive: true,
@@ -112,6 +112,17 @@ export async function getCompanyTrainingModules(): Promise<ModuleResponse> {
       .populate("assignedCompanyId", "name")
       .sort({ createdAt: -1 })
       .lean();
+
+    const globalModules = await TrainingModule.find({
+      isGlobal: true,
+      isActive: true,
+    })
+      .populate("createdBy", "name email")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Combine: company modules first, then global modules
+    const modules = [...companyModules, ...globalModules];
 
     const serializedModules = modules.map((module: any) => {
       try {
@@ -579,6 +590,159 @@ export async function toggleCompanyModuleStatus(
   } catch (error: any) {
     console.error("Toggle company module status error:", error);
     return { success: false, message: "Failed to toggle module status" };
+  }
+}
+
+/**
+ * GET MODULE ANALYTICS (Company Admin Only)
+ */
+export async function getModuleAnalytics(
+  moduleId: string
+): Promise<ModuleResponse> {
+  try {
+    const session = await getSession();
+    
+    if (!session || session.role !== "COMPANY_ADMIN") {
+      return { success: false, message: "Unauthorized" };
+    }
+
+    if (!session.companyId) {
+      return { success: false, message: "No company assigned" };
+    }
+
+    const { TrainingModule } = await getModels();
+    const ModuleProgress = (await import("@/src/models/ModuleProgress")).default;
+    const User = (await import("@/src/models/User")).default;
+
+    // Get module details
+    const module = await TrainingModule.findById(moduleId).lean();
+    
+    if (!module) {
+      return { success: false, message: "Module not found" };
+    }
+
+    // Get all staff users in this company
+    const totalStaff = await User.countDocuments({
+      companyId: session.companyId,
+      role: "STAFF",
+      isDeleted: false,
+      isActive: true,
+    });
+
+    // Get progress records for this module and company
+    const progressRecords = await ModuleProgress.find({
+      moduleId: moduleId,
+      companyId: session.companyId,
+    })
+      .populate("userId", "name email")
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    // Calculate metrics
+    const totalAttempts = progressRecords.length;
+    const uniqueUsers = [...new Set(progressRecords.map((p: any) => p.userId?._id?.toString()))];
+    const totalUsersStarted = uniqueUsers.length;
+    
+    const completedRecords = progressRecords.filter((p: any) => p.status === "COMPLETED");
+    const inProgressRecords = progressRecords.filter((p: any) => p.status === "IN_PROGRESS");
+    const passedRecords = completedRecords.filter((p: any) => p.isPassed);
+    const failedRecords = completedRecords.filter((p: any) => !p.isPassed);
+
+    const completedCount = completedRecords.length;
+    const inProgressCount = inProgressRecords.length;
+    const passedCount = passedRecords.length;
+    const failedCount = failedRecords.length;
+    const notStartedCount = totalStaff - totalUsersStarted;
+
+    // Calculate rates
+    const completionRate = totalUsersStarted > 0 
+      ? Math.round((completedCount / totalUsersStarted) * 100) 
+      : 0;
+    
+    const passRate = completedCount > 0 
+      ? Math.round((passedCount / completedCount) * 100) 
+      : 0;
+
+    const engagementRate = totalStaff > 0
+      ? Math.round((totalUsersStarted / totalStaff) * 100)
+      : 0;
+
+    // Calculate average score
+    const avgScore = completedCount > 0
+      ? Math.round(
+          completedRecords.reduce((sum: number, p: any) => sum + (p.percentage || 0), 0) / completedCount
+        )
+      : 0;
+
+    // Get recent completions (last 10)
+    const recentCompletions = completedRecords.slice(0, 10).map((record: any) => ({
+      userId: record.userId?._id?.toString() || "",
+      userName: record.userId?.name || "Unknown",
+      userEmail: record.userId?.email || "",
+      score: record.score || 0,
+      totalPoints: record.totalPoints || 0,
+      percentage: record.percentage || 0,
+      isPassed: record.isPassed || false,
+      completedAt: record.completedAt,
+      attemptCount: record.attemptCount || 0,
+    }));
+
+    // Get user-wise progress
+    const userProgress = uniqueUsers.map((userId) => {
+      const userRecords = progressRecords.filter(
+        (p: any) => p.userId?._id?.toString() === userId
+      );
+      const latestRecord: any = userRecords[0]; // Already sorted by updatedAt desc
+      
+      return {
+        userId: userId,
+        userName: latestRecord?.userId?.name || "Unknown",
+        userEmail: latestRecord?.userId?.email || "",
+        status: latestRecord?.status || "NOT_STARTED",
+        attemptCount: userRecords.length,
+        lastScore: latestRecord?.percentage || 0,
+        isPassed: latestRecord?.isPassed || false,
+        lastAttempt: latestRecord?.updatedAt,
+      };
+    });
+
+    return {
+      success: true,
+      message: "Analytics fetched successfully",
+      data: {
+        module: {
+          _id: module._id.toString(),
+          title: module.meta.title,
+          category: module.meta.category,
+          isGlobal: module.isGlobal,
+          totalPoints: module.assessment?.totalPoints || 0,
+          passingPoints: module.assessment?.passingPoints || 0,
+          passingPercentage: module.assessment?.passingPercentage || 0,
+        },
+        metrics: {
+          totalStaff,
+          totalAttempts,
+          totalUsersStarted,
+          notStartedCount,
+          completedCount,
+          inProgressCount,
+          passedCount,
+          failedCount,
+          completionRate,
+          passRate,
+          engagementRate,
+          avgScore,
+        },
+        recentCompletions,
+        userProgress,
+      },
+    };
+  } catch (error: any) {
+    console.error("Get module analytics error:", error);
+    return { 
+      success: false, 
+      message: error.message || "Failed to fetch analytics" 
+    };
   }
 }
 
